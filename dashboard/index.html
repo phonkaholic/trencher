@@ -3,1319 +3,1130 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>trencher — solana gem scanner</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<title>TRENCHER — Solana Gem Scanner</title>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root {
-    --void: #000408;
-    --deep: #010a14;
-    --surface: #051525;
-    --panel: rgba(5,21,37,0.85);
-    --border: rgba(0,200,255,0.12);
-    --border-hot: rgba(0,200,255,0.5);
-    --cyan: #00c8ff;
-    --cyan-dim: rgba(0,200,255,0.15);
-    --cyan-glow: 0 0 20px rgba(0,200,255,0.4), 0 0 60px rgba(0,200,255,0.1);
-    --orange: #ff6b00;
-    --orange-dim: rgba(255,107,0,0.15);
-    --orange-glow: 0 0 20px rgba(255,107,0,0.5), 0 0 60px rgba(255,107,0,0.15);
-    --green: #00ff88;
-    --green-dim: rgba(0,255,136,0.1);
-    --red: #ff2244;
-    --yellow: #ffcc00;
-    --grade-s: #ff6b00;
-    --grade-a: #ffcc00;
-    --grade-b: #00c8ff;
-    --grade-c: #334455;
-    --font-display: 'Orbitron', monospace;
-    --font-mono: 'Share Tech Mono', monospace;
-    --font-body: 'Rajdhani', sans-serif;
-  }
+:root {
+  --bg0: #02060a;
+  --bg1: #050d14;
+  --bg2: #081421;
+  --bg3: #0a1828;
+  --line: rgba(0,180,255,0.1);
+  --line2: rgba(0,180,255,0.2);
+  --c: #00b4ff;
+  --cg: rgba(0,180,255,0.08);
+  --cdim: rgba(0,180,255,0.4);
+  --og: #ff5500;
+  --ogd: rgba(255,85,0,0.15);
+  --gn: #00e87a;
+  --gnd: rgba(0,232,122,0.12);
+  --rd: #ff1f3d;
+  --yw: #ffc400;
+  --pu: #b06bff;
+  --txt: #a8cce0;
+  --txt2: #4a7a9b;
+  --txt3: #1e3a50;
+  --f1: 'Chakra Petch', sans-serif;
+  --f2: 'JetBrains Mono', monospace;
+  --gs: #ff5500;
+  --ga: #ffc400;
+  --gb: #00b4ff;
+  --gc2: #1e3a50;
+}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  
-  html { font-size: 14px; cursor: none; }
-  
-  body {
-    background: var(--void);
-    color: #c8e8f8;
-    font-family: var(--font-mono);
-    min-height: 100vh;
-    overflow-x: hidden;
-    position: relative;
-  }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 13px; cursor: crosshair; }
+body {
+  background: var(--bg0);
+  color: var(--txt);
+  font-family: var(--f2);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
 
-  /* ── CUSTOM CURSOR ── */
-  #cursor {
-    position: fixed;
-    width: 20px; height: 20px;
-    border: 1px solid var(--cyan);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 9999;
-    transform: translate(-50%, -50%);
-    transition: transform 0.1s, border-color 0.2s, width 0.2s, height 0.2s;
-    mix-blend-mode: screen;
-  }
-  #cursor-dot {
-    position: fixed;
-    width: 4px; height: 4px;
-    background: var(--cyan);
-    border-radius: 50%;
-    pointer-events: none;
-    z-index: 9999;
-    transform: translate(-50%, -50%);
-    box-shadow: 0 0 6px var(--cyan);
-  }
-  body:hover #cursor { width: 24px; height: 24px; }
+/* ── GRID BACKGROUND ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,180,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,180,255,0.025) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
 
-  /* ── STAR CANVAS ── */
-  #starfield {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-  }
+/* ── CORNER MARKS ── */
+body::after {
+  content: '';
+  position: fixed;
+  top: 8px; left: 8px;
+  width: 20px; height: 20px;
+  border-top: 1px solid var(--c);
+  border-left: 1px solid var(--c);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.5;
+}
 
-  /* ── SCAN LINE OVERLAY ── */
-  body::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,200,255,0.015) 2px,
-      rgba(0,200,255,0.015) 4px
-    );
-    pointer-events: none;
-    z-index: 1;
-    animation: scanMove 8s linear infinite;
-  }
-  @keyframes scanMove {
-    from { background-position: 0 0; }
-    to   { background-position: 0 100px; }
-  }
+/* ── SCANLINE ── */
+#scanline {
+  position: fixed;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,180,255,0.15), transparent);
+  pointer-events: none;
+  z-index: 5;
+  animation: scanDown 6s linear infinite;
+}
+@keyframes scanDown {
+  from { top: -2px; opacity: 1; }
+  to   { top: 100vh; opacity: 0.3; }
+}
 
-  /* ── VIGNETTE ── */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.8) 100%);
-    pointer-events: none;
-    z-index: 1;
-  }
+/* ── HEADER ── */
+header {
+  position: relative;
+  z-index: 20;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line2);
+  background: var(--bg1);
+  flex-shrink: 0;
+}
 
-  /* ── LAYOUT ── */
-  #app {
-    position: relative;
-    z-index: 2;
-    min-height: 100vh;
-    display: grid;
-    grid-template-rows: auto auto 1fr auto;
-    grid-template-columns: 1fr;
-  }
+.h-left { display: flex; align-items: center; gap: 20px; }
 
-  /* ── HEADER ── */
-  header {
-    padding: 0 32px;
-    height: 64px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(180deg, rgba(0,200,255,0.03) 0%, transparent 100%);
-    backdrop-filter: blur(12px);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-  }
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-family: var(--f1);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 4px;
+  color: #fff;
+}
+.logo-icon {
+  width: 28px; height: 28px;
+  position: relative;
+  flex-shrink: 0;
+}
+.logo-icon svg { width: 100%; height: 100%; }
 
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
+.h-tag {
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--txt3);
+  border-left: 1px solid var(--line2);
+  padding-left: 16px;
+  font-family: var(--f1);
+}
 
-  .logo-mark {
-    width: 36px; height: 36px;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .logo-mark::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: 1px solid var(--cyan);
-    transform: rotate(45deg);
-    animation: logoSpin 8s linear infinite;
-  }
-  .logo-mark::after {
-    content: '';
-    position: absolute;
-    inset: 6px;
-    border: 1px solid var(--orange);
-    transform: rotate(45deg);
-    animation: logoSpin 8s linear infinite reverse;
-  }
-  .logo-mark span {
-    font-size: 12px;
-    color: var(--cyan);
-    position: relative;
-    z-index: 1;
-  }
-  @keyframes logoSpin {
-    from { transform: rotate(45deg); }
-    to   { transform: rotate(405deg); }
-  }
+.h-right { display: flex; align-items: center; gap: 20px; }
 
-  .logo-text {
-    font-family: var(--font-display);
-    font-size: 22px;
-    font-weight: 900;
-    letter-spacing: 4px;
-    color: #fff;
-    text-shadow: var(--cyan-glow);
-  }
-  .logo-sub {
-    font-size: 10px;
-    color: rgba(0,200,255,0.5);
-    letter-spacing: 3px;
-    margin-top: 2px;
-    font-family: var(--font-mono);
-  }
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 10px; letter-spacing: 2px;
+  color: var(--gn);
+  font-family: var(--f1);
+}
+.status-dot {
+  width: 6px; height: 6px;
+  background: var(--gn);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--gn);
+  animation: blink 2s ease-in-out infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 24px;
-  }
+#clock {
+  font-family: var(--f2);
+  font-size: 11px;
+  color: var(--txt2);
+  letter-spacing: 1px;
+}
 
-  .live-indicator {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: var(--green);
-  }
-  .live-dot {
-    width: 8px; height: 8px;
-    background: var(--green);
-    border-radius: 50%;
-    box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,136,0.4);
-    animation: livePulse 2s ease-in-out infinite;
-  }
-  @keyframes livePulse {
-    0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 8px var(--green), 0 0 16px rgba(0,255,136,0.4); }
-    50%       { opacity: 0.6; transform: scale(0.8); box-shadow: 0 0 4px var(--green); }
-  }
+.tg-link {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 14px;
+  border: 1px solid var(--line2);
+  color: var(--cdim);
+  font-size: 10px; letter-spacing: 2px;
+  text-decoration: none;
+  font-family: var(--f1);
+  transition: all 0.2s;
+  background: var(--cg);
+}
+.tg-link:hover { border-color: var(--c); color: var(--c); box-shadow: 0 0 12px rgba(0,180,255,0.2); }
 
-  .header-time {
-    font-family: var(--font-display);
-    font-size: 13px;
-    color: rgba(200,232,248,0.4);
-    letter-spacing: 2px;
-  }
+/* ── STATS ROW ── */
+.stats-row {
+  position: relative; z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--line);
+  background: var(--bg1);
+  flex-shrink: 0;
+}
+.stat {
+  padding: 10px 16px;
+  border-right: 1px solid var(--line);
+  position: relative;
+  overflow: hidden;
+}
+.stat:last-child { border-right: none; }
+.stat::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 50%; right: 50%;
+  height: 1px;
+  background: var(--c);
+  transition: all 0.4s ease;
+  opacity: 0;
+}
+.stat:hover::after { left: 0; right: 0; opacity: 1; }
+.sv {
+  font-family: var(--f1);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+.sl { font-size: 8px; letter-spacing: 2px; color: var(--txt3); margin-top: 3px; font-family: var(--f1); }
 
-  .tg-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    background: var(--cyan-dim);
-    color: var(--cyan);
-    font-family: var(--font-mono);
-    font-size: 11px;
-    letter-spacing: 2px;
-    cursor: none;
-    text-decoration: none;
-    transition: all 0.2s;
-    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
-  }
-  .tg-btn:hover {
-    background: var(--cyan-dim);
-    border-color: var(--cyan);
-    box-shadow: var(--cyan-glow);
-    color: #fff;
-  }
+/* ── MAIN 3-COL LAYOUT ── */
+.main {
+  position: relative; z-index: 10;
+  display: grid;
+  grid-template-columns: 280px 1fr 300px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
 
-  /* ── STATS BAR ── */
-  .stats-bar {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    border-bottom: 1px solid var(--border);
-    background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(8px);
-  }
+/* ── LEFT: CA SCANNER ── */
+.ca-panel {
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg1);
+  overflow: hidden;
+}
 
-  .stat-cell {
-    padding: 14px 20px;
-    border-right: 1px solid var(--border);
-    text-align: center;
-    position: relative;
-    overflow: hidden;
-    transition: background 0.3s;
-  }
-  .stat-cell:last-child { border-right: none; }
-  .stat-cell::before {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 1px;
-    background: var(--cyan);
-    transform: scaleX(0);
-    transition: transform 0.4s ease;
-    transform-origin: center;
-  }
-  .stat-cell:hover::before { transform: scaleX(1); }
+.panel-hdr {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg2);
+  flex-shrink: 0;
+}
+.panel-hdr-title {
+  font-family: var(--f1);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--c);
+  flex: 1;
+}
+.hdr-dot {
+  width: 5px; height: 5px;
+  background: var(--c);
+  transform: rotate(45deg);
+  box-shadow: 0 0 6px var(--c);
+  flex-shrink: 0;
+}
 
-  .stat-value {
-    font-family: var(--font-display);
-    font-size: 24px;
-    font-weight: 700;
-    line-height: 1;
-    transition: all 0.3s;
-  }
-  .stat-label {
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(200,232,248,0.35);
-    margin-top: 5px;
-    font-family: var(--font-mono);
-  }
+.ca-body {
+  padding: 12px;
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.ca-body::-webkit-scrollbar { width: 2px; }
+.ca-body::-webkit-scrollbar-thumb { background: var(--line2); }
 
-  /* ── MAIN GRID ── */
-  .main-grid {
-    display: grid;
-    grid-template-columns: 1fr 340px;
-    gap: 0;
-    min-height: 0;
-  }
+.ca-label {
+  font-size: 8px;
+  letter-spacing: 2px;
+  color: var(--txt3);
+  font-family: var(--f1);
+  margin-bottom: 4px;
+}
 
-  /* ── TOKEN FEED ── */
-  .feed-panel {
-    border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
+.ca-input-wrap { display: flex; flex-direction: column; gap: 6px; }
 
-  .panel-header {
-    padding: 14px 24px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: rgba(0,0,0,0.3);
-  }
+#ca-input {
+  width: 100%;
+  background: var(--bg0);
+  border: 1px solid var(--line2);
+  color: #fff;
+  padding: 9px 10px;
+  font-family: var(--f2);
+  font-size: 10px;
+  outline: none;
+  transition: all 0.2s;
+  resize: none;
+  height: 60px;
+}
+#ca-input:focus { border-color: var(--c); box-shadow: 0 0 0 1px var(--c) inset; }
+#ca-input::placeholder { color: var(--txt3); }
 
-  .panel-title {
-    font-family: var(--font-display);
-    font-size: 11px;
-    letter-spacing: 3px;
-    color: var(--cyan);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .panel-title::before {
-    content: '';
-    display: block;
-    width: 6px; height: 6px;
-    background: var(--cyan);
-    transform: rotate(45deg);
-    box-shadow: 0 0 8px var(--cyan);
-  }
+#ca-btn {
+  width: 100%;
+  padding: 9px;
+  background: var(--cg);
+  border: 1px solid var(--c);
+  color: var(--c);
+  font-family: var(--f1);
+  font-size: 10px;
+  letter-spacing: 2px;
+  cursor: crosshair;
+  transition: all 0.2s;
+  font-weight: 600;
+}
+#ca-btn:hover:not(:disabled) { background: rgba(0,180,255,0.15); box-shadow: 0 0 16px rgba(0,180,255,0.2); }
+#ca-btn:disabled { opacity: 0.4; }
 
-  .filter-pills {
-    display: flex;
-    gap: 4px;
-  }
-  .pill {
-    padding: 4px 12px;
-    font-size: 11px;
-    font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: 1px;
-    border: 1px solid transparent;
-    background: transparent;
-    cursor: none;
-    transition: all 0.15s;
-    clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
-  }
-  .pill.active-s { background: rgba(255,107,0,0.2); border-color: var(--orange); color: var(--orange); box-shadow: 0 0 10px rgba(255,107,0,0.3); }
-  .pill.active-a { background: rgba(255,204,0,0.2); border-color: var(--yellow); color: var(--yellow); }
-  .pill.active-b { background: rgba(0,200,255,0.15); border-color: var(--cyan); color: var(--cyan); }
-  .pill.active-all { background: rgba(200,232,248,0.1); border-color: rgba(200,232,248,0.3); color: #c8e8f8; }
-  .pill.inactive { color: rgba(200,232,248,0.3); border-color: rgba(200,232,248,0.08); }
-  .pill.inactive:hover { color: rgba(200,232,248,0.6); border-color: rgba(200,232,248,0.2); }
+.divider {
+  height: 1px;
+  background: var(--line);
+  margin: 4px 0;
+}
 
-  /* ── TABLE HEADER ── */
-  .table-head {
-    display: grid;
-    grid-template-columns: 48px 1fr 70px 95px 85px 90px 85px 75px;
-    padding: 10px 24px;
-    border-bottom: 1px solid var(--border);
-    font-size: 9px;
-    letter-spacing: 2px;
-    color: rgba(200,232,248,0.3);
-    background: rgba(0,0,0,0.5);
-    font-family: var(--font-mono);
-    position: sticky;
-    top: 64px;
-    z-index: 50;
-  }
-  .th { display: flex; align-items: center; }
-  .th.right { justify-content: flex-end; }
+/* CA result styles */
+.ca-result-hdr {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+}
+.ca-grade {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f1); font-weight: 700; font-size: 16px;
+  clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+  flex-shrink: 0;
+}
+.ca-sym { font-family: var(--f1); font-size: 14px; font-weight: 700; color: #fff; }
+.ca-nm  { font-size: 9px; color: var(--txt2); margin-top: 1px; }
+.ca-score-big { font-family: var(--f1); font-size: 22px; font-weight: 700; margin-left: auto; }
 
-  /* ── TOKEN ROWS ── */
-  .token-list {
-    overflow-y: auto;
-    flex: 1;
-  }
-  .token-list::-webkit-scrollbar { width: 3px; }
-  .token-list::-webkit-scrollbar-track { background: transparent; }
-  .token-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.ca-bar-wrap { padding: 8px 10px; background: var(--bg2); border: 1px solid var(--line); border-top: none; }
+.ca-bar-track { height: 3px; background: rgba(255,255,255,0.06); }
+.ca-bar-fill  { height: 100%; transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
 
-  .token-row {
-    display: grid;
-    grid-template-columns: 48px 1fr 70px 95px 85px 90px 85px 75px;
-    padding: 11px 24px;
-    border-bottom: 1px solid rgba(0,200,255,0.05);
-    cursor: none;
-    transition: background 0.15s;
-    position: relative;
-    overflow: hidden;
-    animation: rowIn 0.4s ease both;
-  }
-  @keyframes rowIn {
-    from { opacity: 0; transform: translateX(-10px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  .token-row::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 2px;
-    opacity: 0;
-    transition: opacity 0.2s;
-  }
-  .token-row.grade-S::before { background: var(--orange); box-shadow: var(--orange-glow); }
-  .token-row.grade-A::before { background: var(--yellow); }
-  .token-row.grade-B::before { background: var(--cyan); }
-  .token-row.grade-C::before { background: #334; }
+.ca-stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); }
+.ca-stat-cell { background: var(--bg2); padding: 7px 9px; }
+.ca-stat-lbl { font-size: 7px; letter-spacing: 1.5px; color: var(--txt3); margin-bottom: 2px; }
+.ca-stat-val { font-family: var(--f1); font-size: 12px; font-weight: 600; }
 
-  .token-row:hover { background: rgba(0,200,255,0.04); }
-  .token-row:hover::before { opacity: 1; }
+.ca-flags { display: flex; flex-wrap: wrap; gap: 4px; }
+.flag {
+  font-size: 8px; padding: 2px 6px;
+  border-radius: 1px; border: 1px solid;
+  font-family: var(--f1); letter-spacing: 0.5px;
+}
+.flag-s  { border-color: rgba(255,85,0,0.4);   color: var(--og); background: rgba(255,85,0,0.06); }
+.flag-b  { border-color: rgba(0,232,122,0.3);  color: var(--gn); background: rgba(0,232,122,0.05); }
+.flag-c  { border-color: rgba(0,180,255,0.3);  color: var(--c);  background: rgba(0,180,255,0.05); }
+.flag-d  { border-color: var(--txt3);           color: var(--txt2); background: transparent; }
 
-  .token-row.new-entry {
-    animation: newEntry 0.5s ease both;
-  }
-  @keyframes newEntry {
-    from { background: rgba(255,107,0,0.1); transform: translateX(-8px); }
-    to   { background: transparent; transform: translateX(0); }
-  }
+.ca-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.ca-link {
+  font-size: 8px; padding: 4px 8px;
+  border: 1px solid var(--line2);
+  color: var(--txt2);
+  text-decoration: none;
+  font-family: var(--f1);
+  letter-spacing: 1px;
+  transition: all 0.15s;
+}
+.ca-link:hover { border-color: var(--c); color: var(--c); }
 
-  /* Grade badge */
-  .grade-badge {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px; height: 32px;
-    font-family: var(--font-display);
-    font-weight: 900;
-    font-size: 14px;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  }
-  .grade-S .grade-badge { background: rgba(255,107,0,0.2); color: var(--orange); box-shadow: 0 0 12px rgba(255,107,0,0.3); animation: gradeGlow 2s ease-in-out infinite; }
-  .grade-A .grade-badge { background: rgba(255,204,0,0.15); color: var(--yellow); }
-  .grade-B .grade-badge { background: rgba(0,200,255,0.1); color: var(--cyan); }
-  .grade-C .grade-badge { background: rgba(51,68,85,0.3); color: #334455; }
-  @keyframes gradeGlow {
-    0%, 100% { box-shadow: 0 0 12px rgba(255,107,0,0.3); }
-    50%       { box-shadow: 0 0 24px rgba(255,107,0,0.6), 0 0 48px rgba(255,107,0,0.2); }
-  }
+.ca-warn { font-size: 9px; color: var(--rd); padding: 6px 8px; border: 1px solid rgba(255,31,61,0.2); background: rgba(255,31,61,0.05); }
 
-  .token-info { display: flex; flex-direction: column; justify-content: center; gap: 4px; overflow: hidden; }
-  .token-name { display: flex; align-items: center; gap: 8px; }
-  .token-symbol { font-family: var(--font-display); font-size: 13px; font-weight: 700; color: #fff; white-space: nowrap; }
-  .token-fullname { font-size: 11px; color: rgba(200,232,248,0.4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px; }
-  .token-flags { display: flex; gap: 4px; flex-wrap: wrap; }
-  .flag { font-size: 9px; padding: 1px 6px; border-radius: 2px; letter-spacing: 0.5px; border: 1px solid; }
-  .flag-smart { border-color: rgba(167,139,250,0.4); color: #a78bfa; background: rgba(167,139,250,0.08); }
-  .flag-buy   { border-color: rgba(0,255,136,0.3); color: var(--green); background: rgba(0,255,136,0.06); }
-  .flag-surge { border-color: rgba(255,107,0,0.3); color: var(--orange); background: rgba(255,107,0,0.06); }
-  .flag-safe  { border-color: rgba(0,200,255,0.3); color: var(--cyan); background: rgba(0,200,255,0.06); }
-  .flag-default { border-color: rgba(200,232,248,0.1); color: rgba(200,232,248,0.4); background: transparent; }
+.ca-empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 8px;
+  color: var(--txt3);
+  text-align: center;
+  padding: 20px;
+}
+.ca-empty-icon {
+  width: 40px; height: 40px;
+  border: 1px solid var(--txt3);
+  transform: rotate(45deg);
+  display: flex; align-items: center; justify-content: center;
+  animation: rotPulse 4s ease-in-out infinite;
+}
+.ca-empty-icon span { transform: rotate(-45deg); font-size: 16px; }
+@keyframes rotPulse { 0%,100%{opacity:0.3;transform:rotate(45deg) scale(1)} 50%{opacity:0.6;transform:rotate(45deg) scale(1.05)} }
+.ca-empty-txt { font-family: var(--f1); font-size: 9px; letter-spacing: 2px; }
 
-  .td { display: flex; align-items: center; font-size: 12px; }
-  .td.right { justify-content: flex-end; }
-  .td.center { justify-content: center; }
+/* ── CENTER: LIVE FEED ── */
+.feed-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-right: 1px solid var(--line);
+}
 
-  .score-bar {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 3px;
-    width: 100%;
-  }
-  .score-num { font-family: var(--font-display); font-size: 13px; font-weight: 700; }
-  .score-track { width: 36px; height: 2px; background: rgba(200,232,248,0.1); border-radius: 1px; }
-  .score-fill { height: 100%; border-radius: 1px; transition: width 0.5s ease; }
+.feed-controls {
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg2);
+  flex-shrink: 0;
+}
 
-  .price { font-family: var(--font-mono); font-size: 11px; }
-  .change { font-family: var(--font-display); font-size: 12px; font-weight: 700; }
-  .change.pos { color: var(--green); }
-  .change.neg { color: var(--red); }
-  .change.neu { color: rgba(200,232,248,0.3); }
+.grade-btn {
+  padding: 3px 10px;
+  background: transparent;
+  border: 1px solid var(--line2);
+  color: var(--txt3);
+  font-family: var(--f1);
+  font-size: 9px;
+  letter-spacing: 1px;
+  cursor: crosshair;
+  transition: all 0.15s;
+  font-weight: 600;
+}
+.grade-btn:hover { color: var(--txt); border-color: var(--txt2); }
+.grade-btn.on-all { border-color: var(--c); color: var(--c); background: var(--cg); }
+.grade-btn.on-S   { border-color: var(--og); color: var(--og); background: var(--ogd); }
+.grade-btn.on-A   { border-color: var(--yw); color: var(--yw); background: rgba(255,196,0,0.08); }
+.grade-btn.on-B   { border-color: var(--gb); color: var(--gb); background: var(--cg); }
 
-  .val { font-family: var(--font-mono); font-size: 11px; color: rgba(200,232,248,0.6); }
+.token-count { margin-left: auto; font-size: 9px; color: var(--txt3); font-family: var(--f1); letter-spacing: 1px; }
 
-  .buys-sells { display: flex; align-items: center; gap: 4px; font-size: 11px; }
-  .buys-num { color: var(--green); font-family: var(--font-display); font-size: 12px; font-weight: 600; }
-  .sells-num { color: var(--red); font-family: var(--font-display); font-size: 12px; font-weight: 600; }
+/* Table */
+.tbl-head {
+  display: grid;
+  grid-template-columns: 36px 1fr 55px 90px 75px 80px 80px 60px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--line);
+  font-size: 8px; letter-spacing: 1.5px;
+  color: var(--txt3);
+  background: var(--bg2);
+  flex-shrink: 0;
+  font-family: var(--f1);
+}
+.th { display: flex; align-items: center; }
+.th.r { justify-content: flex-end; }
 
-  .age { font-family: var(--font-mono); font-size: 11px; color: rgba(200,232,248,0.4); }
-  .age.fresh { color: var(--orange); animation: agePulse 1s ease-in-out infinite; }
-  @keyframes agePulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+.token-list { overflow-y: auto; flex: 1; }
+.token-list::-webkit-scrollbar { width: 2px; }
+.token-list::-webkit-scrollbar-thumb { background: var(--line2); }
 
-  /* ── RIGHT PANEL — ALERT HISTORY ── */
-  .alert-panel {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: rgba(0,0,0,0.2);
-  }
+.trow {
+  display: grid;
+  grid-template-columns: 36px 1fr 55px 90px 75px 80px 80px 60px;
+  padding: 9px 14px;
+  border-bottom: 1px solid rgba(0,180,255,0.04);
+  cursor: crosshair;
+  transition: background 0.12s;
+  position: relative;
+  animation: rowIn 0.3s ease both;
+}
+@keyframes rowIn { from { opacity:0; transform:translateX(-6px); } to { opacity:1; transform:translateX(0); } }
+.trow::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.trow:hover { background: rgba(0,180,255,0.03); }
+.trow:hover::before { opacity: 1; }
+.trow.g-S::before { background: var(--gs); }
+.trow.g-A::before { background: var(--ga); }
+.trow.g-B::before { background: var(--gb); }
+.trow.g-C::before { background: var(--gc2); }
+.trow.fresh { animation: freshIn 0.4s ease both; }
+@keyframes freshIn { from{background:rgba(255,85,0,0.08);transform:translateX(-4px)} to{background:transparent;transform:translateX(0)} }
 
-  .alert-list {
-    overflow-y: auto;
-    flex: 1;
-  }
-  .alert-list::-webkit-scrollbar { width: 2px; }
-  .alert-list::-webkit-scrollbar-thumb { background: var(--border); }
+.gbadge {
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--f1); font-weight: 700; font-size: 12px;
+  clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%);
+}
+.gbadge.S { background:rgba(255,85,0,0.2);  color:var(--gs); }
+.gbadge.A { background:rgba(255,196,0,0.15); color:var(--ga); }
+.gbadge.B { background:rgba(0,180,255,0.1);  color:var(--gb); }
+.gbadge.C { background:rgba(30,58,80,0.3);   color:var(--gc2); }
 
-  .alert-card {
-    padding: 14px 18px;
-    border-bottom: 1px solid rgba(0,200,255,0.06);
-    cursor: none;
-    transition: background 0.15s;
-    position: relative;
-    animation: alertIn 0.4s ease both;
-  }
-  @keyframes alertIn {
-    from { opacity: 0; transform: translateX(10px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  .alert-card:hover { background: rgba(0,200,255,0.03); }
-  .alert-card.grade-S { border-left: 2px solid var(--orange); }
-  .alert-card.grade-A { border-left: 2px solid var(--yellow); }
+.tcell { display: flex; align-items: center; font-size: 11px; }
+.tcell.r { justify-content: flex-end; }
+.tcell.c { justify-content: center; }
 
-  .alert-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-  .alert-symbol { font-family: var(--font-display); font-size: 14px; font-weight: 700; color: #fff; }
-  .alert-grade {
-    font-family: var(--font-display);
-    font-size: 11px;
-    font-weight: 900;
-    padding: 2px 8px;
-    clip-path: polygon(4px 0, 100% 0, calc(100% - 4px) 100%, 0 100%);
-  }
-  .alert-grade.S { background: rgba(255,107,0,0.2); color: var(--orange); box-shadow: 0 0 8px rgba(255,107,0,0.3); }
-  .alert-grade.A { background: rgba(255,204,0,0.15); color: var(--yellow); }
+.tname { display: flex; flex-direction: column; gap: 2px; justify-content: center; overflow: hidden; }
+.tsym { font-family: var(--f1); font-size: 12px; font-weight: 600; color: #fff; white-space: nowrap; }
+.tflags { display: flex; gap: 2px; flex-wrap: wrap; }
+.tf { font-size: 7px; padding: 1px 4px; border: 1px solid var(--line2); color: var(--txt2); font-family: var(--f1); white-space: nowrap; }
 
-  .alert-meta { display: flex; justify-content: space-between; font-size: 10px; color: rgba(200,232,248,0.4); margin-bottom: 8px; }
-  .alert-flags { display: flex; flex-wrap: wrap; gap: 3px; }
+.score-col { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.sc-num { font-family: var(--f1); font-size: 12px; font-weight: 700; }
+.sc-bar { width: 32px; height: 2px; background: rgba(255,255,255,0.06); }
+.sc-fill { height: 100%; }
 
-  .alert-score-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .alert-score-track { flex: 1; height: 2px; background: rgba(200,232,248,0.08); border-radius: 1px; }
-  .alert-score-fill { height: 100%; border-radius: 1px; }
-  .alert-score-num { font-family: var(--font-display); font-size: 11px; font-weight: 700; min-width: 24px; text-align: right; }
+.chg { font-family: var(--f1); font-size: 11px; font-weight: 600; }
+.pos { color: var(--gn); }
+.neg { color: var(--rd); }
+.neu { color: var(--txt3); }
 
-  .alert-links { display: flex; gap: 8px; margin-top: 8px; }
-  .alert-link {
-    font-size: 9px;
-    letter-spacing: 1px;
-    color: rgba(0,200,255,0.5);
-    text-decoration: none;
-    border: 1px solid rgba(0,200,255,0.15);
-    padding: 2px 7px;
-    transition: all 0.15s;
-  }
-  .alert-link:hover { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 6px rgba(0,200,255,0.2); }
+.bs { display: flex; align-items: center; gap: 3px; font-family: var(--f1); font-size: 11px; }
 
-  /* ── EMPTY STATES ── */
-  .empty-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 60px 20px;
-    color: rgba(200,232,248,0.2);
-    gap: 12px;
-    text-align: center;
-  }
-  .empty-icon { font-size: 32px; opacity: 0.3; animation: emptyPulse 3s ease-in-out infinite; }
-  @keyframes emptyPulse { 0%,100%{opacity:0.3} 50%{opacity:0.6} }
-  .empty-text { font-family: var(--font-display); font-size: 11px; letter-spacing: 2px; }
-  .empty-sub { font-size: 11px; color: rgba(200,232,248,0.15); }
+.age-col { font-size: 10px; color: var(--txt2); font-family: var(--f1); }
+.age-hot { color: var(--og); animation: ageBlink 1.5s ease-in-out infinite; }
+@keyframes ageBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* ── MODAL ── */
-  #modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,4,8,0.9);
-    backdrop-filter: blur(8px);
-    z-index: 500;
-    display: none;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-  #modal-overlay.open { display: flex; }
+.feed-empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 16px; color: var(--txt3);
+}
+.radar-wrap { position: relative; width: 80px; height: 80px; }
+.radar-ring {
+  position: absolute; border: 1px solid var(--c);
+  border-radius: 50%; opacity: 0;
+  animation: radarPulse 2.5s ease-out infinite;
+}
+.radar-ring:nth-child(1) { inset: 0;   animation-delay: 0s; }
+.radar-ring:nth-child(2) { inset: 18px; animation-delay: 0.6s; }
+.radar-ring:nth-child(3) { inset: 36px; animation-delay: 1.2s; }
+@keyframes radarPulse { 0%{opacity:0.7;transform:scale(0.6)} 100%{opacity:0;transform:scale(1.4)} }
+.feed-empty-txt { font-family: var(--f1); font-size: 10px; letter-spacing: 3px; }
 
-  #modal {
-    background: var(--surface);
-    border: 1px solid var(--border-hot);
-    width: 100%;
-    max-width: 580px;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: var(--cyan-glow);
-    clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-    animation: modalIn 0.3s ease;
-    position: relative;
-  }
-  #modal::-webkit-scrollbar { width: 2px; }
-  #modal::-webkit-scrollbar-thumb { background: var(--border); }
-  @keyframes modalIn {
-    from { opacity: 0; transform: scale(0.95) translateY(10px); }
-    to   { opacity: 1; transform: scale(1) translateY(0); }
-  }
+/* ── RIGHT: ALERT HISTORY ── */
+.alert-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg1);
+}
 
-  .modal-close {
-    position: absolute;
-    top: 14px; right: 16px;
-    background: none;
-    border: none;
-    color: rgba(200,232,248,0.4);
-    font-size: 16px;
-    cursor: none;
-    transition: color 0.15s;
-    font-family: var(--font-mono);
-  }
-  .modal-close:hover { color: var(--red); }
+.alert-list { overflow-y: auto; flex: 1; }
+.alert-list::-webkit-scrollbar { width: 2px; }
+.alert-list::-webkit-scrollbar-thumb { background: var(--line2); }
 
-  .modal-header {
-    padding: 24px 28px 20px;
-    border-bottom: 1px solid var(--border);
-    background: linear-gradient(135deg, rgba(0,200,255,0.03), transparent);
-  }
-  .modal-token-row { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
-  .modal-grade {
-    font-family: var(--font-display);
-    font-size: 28px;
-    font-weight: 900;
-    width: 56px; height: 56px;
-    display: flex; align-items: center; justify-content: center;
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  }
-  .modal-grade.S { background: rgba(255,107,0,0.2); color: var(--orange); box-shadow: 0 0 20px rgba(255,107,0,0.4); }
-  .modal-grade.A { background: rgba(255,204,0,0.15); color: var(--yellow); }
-  .modal-grade.B { background: rgba(0,200,255,0.1); color: var(--cyan); }
-  .modal-grade.C { background: rgba(51,68,85,0.2); color: #445; }
-  .modal-symbol { font-family: var(--font-display); font-size: 26px; font-weight: 900; color: #fff; }
-  .modal-name { font-size: 13px; color: rgba(200,232,248,0.5); margin-top: 2px; }
-  .modal-address { font-size: 10px; color: rgba(200,232,248,0.3); font-family: var(--font-mono); margin-top: 4px; }
+.acard {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(0,180,255,0.05);
+  cursor: crosshair;
+  transition: background 0.12s;
+  position: relative;
+  animation: aIn 0.3s ease both;
+}
+@keyframes aIn { from{opacity:0;transform:translateX(6px)} to{opacity:1;transform:translateX(0)} }
+.acard:hover { background: rgba(0,180,255,0.03); }
+.acard.as { border-left: 2px solid var(--og); }
+.acard.aa { border-left: 2px solid var(--ga); }
 
-  .modal-score-section { padding: 16px 28px; border-bottom: 1px solid var(--border); }
-  .modal-score-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
-  .modal-score-label { font-size: 10px; letter-spacing: 2px; color: rgba(200,232,248,0.4); }
-  .modal-score-value { font-family: var(--font-display); font-size: 20px; font-weight: 700; }
-  .modal-score-track { height: 6px; background: rgba(200,232,248,0.08); border-radius: 3px; overflow: hidden; }
-  .modal-score-fill { height: 100%; border-radius: 3px; transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.atop { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.asym { font-family: var(--f1); font-size: 13px; font-weight: 700; color: #fff; }
+.abadge { font-family: var(--f1); font-weight: 700; font-size: 10px; padding: 2px 7px; }
+.abadge.S { background: rgba(255,85,0,0.15); color: var(--og); }
+.abadge.A { background: rgba(255,196,0,0.1); color: var(--ga); }
 
-  .modal-flags { padding: 16px 28px; border-bottom: 1px solid var(--border); display: flex; flex-wrap: wrap; gap: 6px; }
+.ameta { display: flex; justify-content: space-between; font-size: 9px; color: var(--txt3); margin-bottom: 6px; }
 
-  .modal-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--border); }
-  .modal-stat {
-    background: var(--surface);
-    padding: 14px 16px;
-  }
-  .modal-stat-label { font-size: 9px; letter-spacing: 2px; color: rgba(200,232,248,0.3); margin-bottom: 6px; }
-  .modal-stat-value { font-family: var(--font-display); font-size: 16px; font-weight: 700; }
+.abar { height: 2px; background: rgba(255,255,255,0.05); margin-bottom: 6px; }
+.abar-fill { height: 100%; }
 
-  .modal-links { padding: 16px 28px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .modal-link {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border: 1px solid var(--border);
-    color: rgba(200,232,248,0.5);
-    font-size: 11px;
-    letter-spacing: 1px;
-    text-decoration: none;
-    transition: all 0.2s;
-    font-family: var(--font-mono);
-    clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
-  }
-  .modal-link:hover { border-color: var(--cyan); color: var(--cyan); background: var(--cyan-dim); box-shadow: var(--cyan-glow); }
+.alinks { display: flex; gap: 4px; }
+.alink { font-size: 8px; padding: 2px 6px; border: 1px solid var(--line2); color: var(--txt2); text-decoration: none; font-family: var(--f1); letter-spacing: 1px; transition: all 0.15s; }
+.alink:hover { border-color: var(--c); color: var(--c); }
 
-  /* ── FOOTER ── */
-  footer {
-    padding: 12px 32px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: rgba(0,0,0,0.5);
-    font-size: 10px;
-    color: rgba(200,232,248,0.2);
-    font-family: var(--font-mono);
-    letter-spacing: 1px;
-  }
-  footer a { color: var(--cyan); text-decoration: none; opacity: 0.6; transition: opacity 0.2s; }
-  footer a:hover { opacity: 1; }
+.alert-empty {
+  flex: 1;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 10px; color: var(--txt3);
+}
+.ae-icon { font-size: 24px; opacity: 0.3; animation: aePulse 3s ease-in-out infinite; }
+@keyframes aePulse { 0%,100%{opacity:0.2} 50%{opacity:0.5} }
+.ae-txt { font-family: var(--f1); font-size: 9px; letter-spacing: 2px; }
 
-  /* ── LOADING ── */
-  .loading-row {
-    padding: 12px 24px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border-bottom: 1px solid rgba(0,200,255,0.04);
-    opacity: 0.4;
-  }
-  .skeleton {
-    border-radius: 2px;
-    background: linear-gradient(90deg, rgba(200,232,248,0.05) 25%, rgba(200,232,248,0.1) 50%, rgba(200,232,248,0.05) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-  }
-  @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+/* ── MODAL ── */
+#modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(2,6,10,0.92);
+  backdrop-filter: blur(4px);
+  z-index: 500;
+  display: none;
+  align-items: center; justify-content: center;
+  padding: 20px;
+}
+#modal-bg.open { display: flex; }
+#modal {
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  width: 100%; max-width: 560px;
+  max-height: 88vh;
+  overflow-y: auto;
+  animation: mIn 0.25s ease;
+  position: relative;
+}
+#modal::-webkit-scrollbar { width: 2px; }
+#modal::-webkit-scrollbar-thumb { background: var(--line2); }
+@keyframes mIn { from{opacity:0;transform:scale(0.97)} to{opacity:1;transform:scale(1)} }
+.m-close { position: absolute; top: 12px; right: 14px; background: none; border: none; color: var(--txt3); font-size: 14px; cursor: crosshair; transition: color 0.15s; font-family: var(--f2); }
+.m-close:hover { color: var(--rd); }
+.m-hdr { padding: 18px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
+.m-grade { width: 52px; height: 52px; display: flex; align-items: center; justify-content: center; font-family: var(--f1); font-size: 24px; font-weight: 700; clip-path: polygon(50% 0%,100% 50%,50% 100%,0% 50%); flex-shrink: 0; }
+.m-sym { font-family: var(--f1); font-size: 22px; font-weight: 700; color: #fff; }
+.m-name { font-size: 11px; color: var(--txt2); }
+.m-addr { font-size: 9px; color: var(--txt3); margin-top: 3px; word-break: break-all; }
+.m-score-section { padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.m-score-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 9px; letter-spacing: 2px; color: var(--txt3); font-family: var(--f1); }
+.m-score-val { font-family: var(--f1); font-size: 18px; font-weight: 700; }
+.m-bar { height: 4px; background: rgba(255,255,255,0.06); }
+.m-bar-fill { height: 100%; transition: width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
+.m-flags { padding: 12px 20px; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 5px; }
+.m-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: var(--line); }
+.m-stat { background: var(--bg2); padding: 12px 14px; }
+.m-stat-lbl { font-size: 8px; letter-spacing: 2px; color: var(--txt3); margin-bottom: 4px; font-family: var(--f1); }
+.m-stat-val { font-family: var(--f1); font-size: 14px; font-weight: 600; }
+.m-links { padding: 14px 20px; display: flex; gap: 8px; flex-wrap: wrap; }
+.m-link { padding: 6px 12px; border: 1px solid var(--line2); color: var(--txt2); font-size: 10px; text-decoration: none; font-family: var(--f1); letter-spacing: 1px; transition: all 0.15s; }
+.m-link:hover { border-color: var(--c); color: var(--c); box-shadow: 0 0 8px rgba(0,180,255,0.15); }
 
-  /* ── NOTIFICATION TOAST ── */
-  #toast-container {
-    position: fixed;
-    top: 80px;
-    right: 24px;
-    z-index: 1000;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    pointer-events: none;
-  }
-  .toast {
-    padding: 12px 18px;
-    background: var(--surface);
-    border: 1px solid;
-    font-size: 12px;
-    font-family: var(--font-mono);
-    animation: toastIn 0.3s ease, toastOut 0.3s ease 3.7s forwards;
-    clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
-    letter-spacing: 1px;
-    max-width: 320px;
-  }
-  .toast.grade-S { border-color: var(--orange); color: var(--orange); background: rgba(255,107,0,0.1); box-shadow: var(--orange-glow); }
-  .toast.grade-A { border-color: var(--yellow); color: var(--yellow); background: rgba(255,204,0,0.08); }
-  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-  @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateX(20px); } }
+/* ── TOAST ── */
+#toasts {
+  position: fixed; top: 60px; right: 16px;
+  z-index: 1000;
+  display: flex; flex-direction: column; gap: 6px;
+  pointer-events: none;
+}
+.toast {
+  padding: 10px 14px;
+  background: var(--bg2);
+  border: 1px solid;
+  font-size: 11px; font-family: var(--f1); letter-spacing: 1px;
+  max-width: 280px;
+  animation: tIn 0.3s ease, tOut 0.3s ease 3.7s forwards;
+}
+.toast.S { border-color: var(--og); color: var(--og); background: rgba(255,85,0,0.08); }
+.toast.A { border-color: var(--ga); color: var(--ga); background: rgba(255,196,0,0.06); }
+@keyframes tIn  { from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:translateX(0)} }
+@keyframes tOut { from{opacity:1} to{opacity:0;transform:translateX(16px)} }
 
-  /* ── RADAR ANIMATION (empty state) ── */
-  .radar {
-    width: 80px; height: 80px;
-    position: relative;
-    margin: 0 auto;
-  }
-  .radar-ring {
-    position: absolute;
-    border: 1px solid var(--cyan);
-    border-radius: 50%;
-    opacity: 0;
-    animation: radarExpand 2s ease-out infinite;
-  }
-  .radar-ring:nth-child(1) { inset: 0; animation-delay: 0s; }
-  .radar-ring:nth-child(2) { inset: 15px; animation-delay: 0.5s; }
-  .radar-ring:nth-child(3) { inset: 30px; animation-delay: 1s; }
-  @keyframes radarExpand {
-    0%   { opacity: 0.8; transform: scale(0.5); }
-    100% { opacity: 0; transform: scale(1.5); }
-  }
+/* ── CORNER DECORATIONS ── */
+.corner { position: fixed; pointer-events: none; z-index: 3; }
+.corner.br { bottom: 8px; right: 8px; width: 20px; height: 20px; border-bottom: 1px solid rgba(0,180,255,0.3); border-right: 1px solid rgba(0,180,255,0.3); }
+.corner.tr { top: 8px; right: 8px; width: 20px; height: 20px; border-top: 1px solid rgba(0,180,255,0.3); border-right: 1px solid rgba(0,180,255,0.3); }
 </style>
 </head>
 <body>
 
-<canvas id="starfield"></canvas>
-<div id="cursor"></div>
-<div id="cursor-dot"></div>
-<div id="toast-container"></div>
+<div id="scanline"></div>
+<div class="corner br"></div>
+<div class="corner tr"></div>
+<div id="toasts"></div>
 
-<div id="app">
-
-  <!-- HEADER -->
-  <header>
+<!-- HEADER -->
+<header>
+  <div class="h-left">
     <div class="logo">
-      <div class="logo-mark"><span>⬡</span></div>
+      <div class="logo-icon">
+        <svg viewBox="0 0 28 28" fill="none">
+          <polygon points="14,2 26,14 14,26 2,14" stroke="#00b4ff" stroke-width="1" fill="rgba(0,180,255,0.05)"/>
+          <polygon points="14,7 21,14 14,21 7,14" stroke="#ff5500" stroke-width="1" fill="none" opacity="0.7"/>
+          <circle cx="14" cy="14" r="2" fill="#00b4ff"/>
+        </svg>
+      </div>
+      TRENCHER
+    </div>
+    <div class="h-tag">SOLANA GEM SCANNER</div>
+  </div>
+  <div class="h-right">
+    <div class="status-pill"><div class="status-dot"></div>ONLINE</div>
+    <div id="clock">--:--:-- UTC</div>
+    <a href="https://t.me/trencheralertbot" target="_blank" class="tg-link">✈ @TRENCHERALERTBOT</a>
+  </div>
+</header>
+
+<!-- STATS ROW -->
+<div class="stats-row">
+  <div class="stat"><div class="sv" id="s-total" style="color:var(--c)">0</div><div class="sl">SCANNED</div></div>
+  <div class="stat"><div class="sv" id="s-s" style="color:var(--og)">0</div><div class="sl">GRADE S</div></div>
+  <div class="stat"><div class="sv" id="s-a" style="color:var(--ga)">0</div><div class="sl">GRADE A</div></div>
+  <div class="stat"><div class="sv" id="s-b" style="color:var(--gb)">0</div><div class="sl">GRADE B</div></div>
+  <div class="stat"><div class="sv" id="s-avg" style="color:var(--gn)">0</div><div class="sl">AVG SCORE</div></div>
+  <div class="stat"><div class="sv" id="s-alerts" style="color:var(--pu)">0</div><div class="sl">ALERTS</div></div>
+  <div class="stat"><div class="sv" id="s-time" style="color:var(--gn);font-size:12px">LIVE</div><div class="sl">STATUS</div></div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: CA SCANNER -->
+  <div class="ca-panel">
+    <div class="panel-hdr">
+      <div class="hdr-dot"></div>
+      <div class="panel-hdr-title">CA SCANNER</div>
+    </div>
+    <div class="ca-body">
       <div>
-        <div class="logo-text">TRENCHER</div>
-        <div class="logo-sub">SOLANA GEM SCANNER</div>
+        <div class="ca-label">CONTRACT ADDRESS</div>
+        <div class="ca-input-wrap">
+          <textarea id="ca-input" placeholder="Paste Solana CA here...&#10;Press Ctrl+Enter to scan" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key==='Enter')analyzeCA()"></textarea>
+          <button id="ca-btn" onclick="analyzeCA()">⬡ ANALYZE TOKEN</button>
+        </div>
       </div>
-    </div>
-    <div class="header-right">
-      <div class="live-indicator">
-        <div class="live-dot"></div>
-        <span>LIVE</span>
+      <div class="divider"></div>
+      <div id="ca-result">
+        <div class="ca-empty">
+          <div class="ca-empty-icon"><span>⬡</span></div>
+          <div class="ca-empty-txt">AWAITING INPUT</div>
+          <div style="font-size:8px;color:var(--txt3);letter-spacing:1px;margin-top:4px;">paste CA → analyze</div>
+        </div>
       </div>
-      <div class="header-time" id="clock">--:--:--</div>
-      <a href="https://t.me/trencheralerts" target="_blank" class="tg-btn">
-        ✈ TELEGRAM
-      </a>
-    </div>
-  </header>
-
-  <!-- STATS BAR -->
-  <div class="stats-bar">
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-total" style="color:var(--cyan)">0</div>
-      <div class="stat-label">SCANNED</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-s" style="color:var(--orange)">0</div>
-      <div class="stat-label">GRADE S 🔴</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-a" style="color:var(--yellow)">0</div>
-      <div class="stat-label">GRADE A ⚡</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-b" style="color:var(--cyan)">0</div>
-      <div class="stat-label">GRADE B 👀</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-avg" style="color:var(--green)">0</div>
-      <div class="stat-label">AVG SCORE</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-alerts" style="color:#a78bfa">0</div>
-      <div class="stat-label">ALERTS FIRED</div>
-    </div>
-    <div class="stat-cell">
-      <div class="stat-value" id="stat-uptime" style="color:var(--green)">LIVE</div>
-      <div class="stat-label">STATUS</div>
     </div>
   </div>
 
-  <!-- MAIN GRID -->
-  <div class="main-grid">
-
-    <!-- LEFT: TOKEN FEED -->
-    <div class="feed-panel">
-      <div class="panel-header">
-        <div class="panel-title">LIVE TOKEN FEED</div>
-        <div class="filter-pills">
-          <button class="pill active-all" onclick="setFilter('ALL')">ALL</button>
-          <button class="pill inactive" onclick="setFilter('S')">S</button>
-          <button class="pill inactive" onclick="setFilter('A')">A</button>
-          <button class="pill inactive" onclick="setFilter('B')">B</button>
+  <!-- CENTER: LIVE FEED -->
+  <div class="feed-panel">
+    <div class="panel-hdr">
+      <div class="hdr-dot"></div>
+      <div class="panel-hdr-title">LIVE TOKEN FEED</div>
+    </div>
+    <div class="feed-controls">
+      <button class="grade-btn on-all" onclick="setFilter('ALL',this)">ALL</button>
+      <button class="grade-btn" onclick="setFilter('S',this)">GRADE S</button>
+      <button class="grade-btn" onclick="setFilter('A',this)">GRADE A</button>
+      <button class="grade-btn" onclick="setFilter('B',this)">GRADE B</button>
+      <div class="token-count" id="token-count">0 tokens</div>
+    </div>
+    <div class="tbl-head">
+      <div class="th">GRD</div>
+      <div class="th">TOKEN</div>
+      <div class="th r">SCR</div>
+      <div class="th r">PRICE</div>
+      <div class="th r">5M%</div>
+      <div class="th r">FDV</div>
+      <div class="th r">B/S</div>
+      <div class="th r">AGE</div>
+    </div>
+    <div class="token-list" id="token-list">
+      <div class="feed-empty">
+        <div class="radar-wrap">
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
+          <div class="radar-ring"></div>
         </div>
-      </div>
-      <div class="table-head">
-        <div class="th">GRD</div>
-        <div class="th">TOKEN</div>
-        <div class="th right">SCR</div>
-        <div class="th right">PRICE</div>
-        <div class="th right">5M%</div>
-        <div class="th right">FDV</div>
-        <div class="th right">BUYS/SELLS</div>
-        <div class="th right">AGE</div>
-      </div>
-      <div class="token-list" id="token-list">
-        <div class="empty-state">
-          <div class="radar">
-            <div class="radar-ring"></div>
-            <div class="radar-ring"></div>
-            <div class="radar-ring"></div>
-          </div>
-          <div class="empty-text">INITIALIZING SCANNER</div>
-          <div class="empty-sub">connecting to supabase realtime...</div>
-        </div>
+        <div class="feed-empty-txt">SCANNING TRENCHES</div>
+        <div style="font-size:9px;color:var(--txt3)">awaiting scanner data...</div>
       </div>
     </div>
-
-    <!-- RIGHT: ALERT HISTORY -->
-    <div class="alert-panel">
-      <div class="panel-header">
-        <div class="panel-title">ALERT HISTORY</div>
-        <div style="font-size:10px;color:rgba(200,232,248,0.3);font-family:var(--font-mono)">GRADE S + A</div>
-      </div>
-      <div class="alert-list" id="alert-list">
-        <div class="empty-state">
-          <div class="empty-icon">📡</div>
-          <div class="empty-text">SCANNING...</div>
-          <div class="empty-sub">alerts will appear here</div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
-  <!-- FOOTER -->
-  <footer>
-    <span>trencher v1.0 — <a href="https://github.com/phonkaholic/trencher">open source</a></span>
-    <span id="footer-count">0 tokens tracked</span>
-    <span>⚠ not financial advice — DYOR</span>
-  </footer>
+  <!-- RIGHT: ALERT HISTORY -->
+  <div class="alert-panel">
+    <div class="panel-hdr">
+      <div class="hdr-dot" style="background:var(--og);box-shadow:0 0 6px var(--og)"></div>
+      <div class="panel-hdr-title">ALERT HISTORY</div>
+      <div style="font-size:8px;color:var(--txt3);font-family:var(--f1)">S + A ONLY</div>
+    </div>
+    <div class="alert-list" id="alert-list">
+      <div class="alert-empty">
+        <div class="ae-icon">📡</div>
+        <div class="ae-txt">NO ALERTS YET</div>
+      </div>
+    </div>
+  </div>
 
 </div>
 
-<!-- TOKEN MODAL -->
-<div id="modal-overlay" onclick="closeModal(event)">
+<!-- MODAL -->
+<div id="modal-bg" onclick="closeMod(event)">
   <div id="modal">
-    <button class="modal-close" onclick="closeModal()">✕ CLOSE</button>
-    <div id="modal-content"></div>
+    <button class="m-close" onclick="closeMod()">✕</button>
+    <div id="modal-inner"></div>
   </div>
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// STARFIELD
-// ══════════════════════════════════════════════════════════
-const canvas = document.getElementById('starfield');
-const ctx = canvas.getContext('2d');
-let stars = [];
+// ══ CONFIG ══════════════════════════════════════════════════
+const SB_URL = 'https://wwlomifjbgblcvjhggdb.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bG9taWZqYmdibGN2amhnZ2RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExODQ0MzQsImV4cCI6MjA4Njc2MDQzNH0.2_w4SV9tJcF5XcSSunrqKiI0SgPcgjuKbtSvjPsR_Mg';
+const sb = supabase.createClient(SB_URL, SB_KEY);
 
-function initStars() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  stars = Array.from({ length: 200 }, () => ({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    r: Math.random() * 1.2,
-    speed: Math.random() * 0.3 + 0.05,
-    opacity: Math.random() * 0.6 + 0.1,
-    twinkle: Math.random() * Math.PI * 2,
-  }));
-}
+// ══ CLOCK ════════════════════════════════════════════════════
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toUTCString().slice(17,25) + ' UTC';
+}, 1000);
 
-function drawStars(t) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  stars.forEach(s => {
-    s.twinkle += 0.02;
-    const op = s.opacity * (0.7 + 0.3 * Math.sin(s.twinkle));
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(200,232,248,${op})`;
-    ctx.fill();
-    s.y -= s.speed;
-    if (s.y < -2) { s.y = canvas.height + 2; s.x = Math.random() * canvas.width; }
-  });
-  // Occasional shooting star
-  if (Math.random() < 0.002) drawShootingStar();
-  requestAnimationFrame(drawStars);
-}
+// ══ STATE ════════════════════════════════════════════════════
+let tokens = [], alerts = [], filter = 'ALL';
 
-function drawShootingStar() {
-  const x = Math.random() * canvas.width;
-  const y = Math.random() * canvas.height * 0.5;
-  const len = 80 + Math.random() * 120;
-  const grad = ctx.createLinearGradient(x, y, x + len, y + len * 0.3);
-  grad.addColorStop(0, 'rgba(0,200,255,0)');
-  grad.addColorStop(0.5, 'rgba(0,200,255,0.8)');
-  grad.addColorStop(1, 'rgba(0,200,255,0)');
-  ctx.beginPath();
-  ctx.moveTo(x, y);
-  ctx.lineTo(x + len, y + len * 0.3);
-  ctx.strokeStyle = grad;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-}
-
-window.addEventListener('resize', initStars);
-initStars();
-requestAnimationFrame(drawStars);
-
-// ══════════════════════════════════════════════════════════
-// CUSTOM CURSOR
-// ══════════════════════════════════════════════════════════
-const cursor = document.getElementById('cursor');
-const cursorDot = document.getElementById('cursor-dot');
-let cx = 0, cy = 0, tx = 0, ty = 0;
-
-document.addEventListener('mousemove', e => { tx = e.clientX; ty = e.clientY; });
-
-function animateCursor() {
-  cx += (tx - cx) * 0.15;
-  cy += (ty - cy) * 0.15;
-  cursor.style.left = cx + 'px';
-  cursor.style.top = cy + 'px';
-  cursorDot.style.left = tx + 'px';
-  cursorDot.style.top = ty + 'px';
-  requestAnimationFrame(animateCursor);
-}
-animateCursor();
-
-document.querySelectorAll('a, button, .token-row, .alert-card').forEach(el => {
-  el.addEventListener('mouseenter', () => {
-    cursor.style.width = '36px';
-    cursor.style.height = '36px';
-    cursor.style.borderColor = 'var(--orange)';
-  });
-  el.addEventListener('mouseleave', () => {
-    cursor.style.width = '20px';
-    cursor.style.height = '20px';
-    cursor.style.borderColor = 'var(--cyan)';
-  });
-});
-
-// ══════════════════════════════════════════════════════════
-// CLOCK
-// ══════════════════════════════════════════════════════════
-function updateClock() {
-  const now = new Date();
-  document.getElementById('clock').textContent =
-    now.toUTCString().slice(17, 25) + ' UTC';
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// ══════════════════════════════════════════════════════════
-// DATA LAYER
-// ══════════════════════════════════════════════════════════
-const SUPABASE_URL = 'https://wwlomifjbgblcvjhggdb.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind3bG9taWZqYmdibGN2amhnZ2RiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExODQ0MzQsImV4cCI6MjA4Njc2MDQzNH0.2_w4SV9tJcF5XcSSunrqKiI0SgPcgjuKbtSvjPsR_Mg';
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let allTokens = [];
-let allAlerts = [];
-let currentFilter = 'ALL';
-
-// ── FETCH INITIAL DATA ──
-async function loadInitial() {
-  const [{ data: tokens }, { data: alerts }] = await Promise.all([
+// ══ LOAD ═════════════════════════════════════════════════════
+async function load() {
+  const [{ data: t }, { data: a }] = await Promise.all([
     sb.from('tokens').select('*').order('scored_at', { ascending: false }).limit(200),
     sb.from('alerts').select('*').order('alerted_at', { ascending: false }).limit(50)
   ]);
-
-  if (tokens) { allTokens = tokens; renderTokens(); updateStats(); }
-  if (alerts) { allAlerts = alerts; renderAlerts(); }
+  if (t) { tokens = t; renderFeed(); updateStats(); }
+  if (a) { alerts = a; renderAlerts(); }
 }
 
-// ── REALTIME SUBSCRIPTIONS ──
-sb.channel('trencher-live')
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tokens' }, ({ new: token }) => {
-    allTokens.unshift(token);
-    if (allTokens.length > 200) allTokens.pop();
-    renderTokens();
-    updateStats();
-    showToast(token);
+// ══ REALTIME ═════════════════════════════════════════════════
+sb.channel('live')
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tokens' }, ({ new: r }) => {
+    tokens.unshift(r); if (tokens.length > 200) tokens.pop();
+    renderFeed(); updateStats(); toast(r);
   })
-  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tokens' }, ({ new: token }) => {
-    const idx = allTokens.findIndex(t => t.address === token.address);
-    if (idx >= 0) allTokens[idx] = token;
-    else allTokens.unshift(token);
-    renderTokens();
-    updateStats();
+  .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tokens' }, ({ new: r }) => {
+    const i = tokens.findIndex(t => t.address === r.address);
+    if (i >= 0) tokens[i] = r; else tokens.unshift(r);
+    renderFeed(); updateStats();
   })
-  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, ({ new: alert }) => {
-    allAlerts.unshift(alert);
-    renderAlerts();
+  .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'alerts' }, ({ new: r }) => {
+    alerts.unshift(r); renderAlerts();
   })
   .subscribe();
 
-loadInitial();
+load();
 
-// ══════════════════════════════════════════════════════════
-// RENDER TOKENS
-// ══════════════════════════════════════════════════════════
-function setFilter(f) {
-  currentFilter = f;
-  document.querySelectorAll('.pill').forEach(p => {
-    p.className = 'pill inactive';
-  });
-  const map = { ALL: 'active-all', S: 'active-s', A: 'active-a', B: 'active-b' };
-  event.target.className = `pill ${map[f]}`;
-  renderTokens();
+// ══ RENDER FEED ══════════════════════════════════════════════
+function setFilter(f, btn) {
+  filter = f;
+  document.querySelectorAll('.grade-btn').forEach(b => b.className = 'grade-btn');
+  if (btn) btn.className = 'grade-btn on-' + f;
+  renderFeed();
 }
 
-function renderTokens() {
+function renderFeed() {
   const list = document.getElementById('token-list');
-  const filtered = currentFilter === 'ALL'
-    ? allTokens
-    : allTokens.filter(t => t.grade === currentFilter);
+  const filtered = filter === 'ALL' ? tokens : tokens.filter(t => t.grade === filter);
+  document.getElementById('token-count').textContent = filtered.length + ' tokens';
 
   if (!filtered.length) {
-    list.innerHTML = `<div class="empty-state">
-      <div class="radar"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div></div>
-      <div class="empty-text">SCANNING TRENCHES</div>
-      <div class="empty-sub">awaiting grade ${currentFilter} signals...</div>
-    </div>`;
+    list.innerHTML = `<div class="feed-empty"><div class="radar-wrap"><div class="radar-ring"></div><div class="radar-ring"></div><div class="radar-ring"></div></div><div class="feed-empty-txt">SCANNING TRENCHES</div><div style="font-size:9px;color:var(--txt3)">awaiting grade ${filter} signals...</div></div>`;
     return;
   }
 
-  list.innerHTML = filtered.map((t, i) => `
-    <div class="token-row grade-${t.grade} ${i === 0 ? 'new-entry' : ''}"
-         onclick="openModal('${t.address}')"
-         style="animation-delay:${Math.min(i * 0.02, 0.5)}s">
-      <div class="td center">
-        <div class="grade-badge">${t.grade}</div>
-      </div>
-      <div class="token-info">
-        <div class="token-name">
-          ${t.image_url ? `<img src="${t.image_url}" style="width:16px;height:16px;border-radius:50%;object-fit:cover" onerror="this.style.display='none'">` : ''}
-          <span class="token-symbol">${esc(t.symbol || '???')}</span>
-          <span class="token-fullname">${esc((t.name || '').slice(0, 18))}</span>
-        </div>
-        <div class="token-flags">${renderFlags(t.flags)}</div>
-      </div>
-      <div class="td right">
-        <div class="score-bar">
-          <div class="score-num" style="color:${gradeColor(t.grade)}">${t.score}</div>
-          <div class="score-track"><div class="score-fill" style="width:${t.score}%;background:${gradeColor(t.grade)}"></div></div>
+  list.innerHTML = filtered.map((t, i) => {
+    const gc = gcolor(t.grade);
+    const ageMin = t.pair_created_at ? Math.floor((Date.now() - new Date(t.pair_created_at)) / 60000) : null;
+    const ageStr = ageMin === null ? '?' : ageMin < 60 ? ageMin + 'm' : Math.floor(ageMin/60) + 'h';
+    const fresh = ageMin !== null && ageMin < 8;
+    const isNew = i === 0 && (Date.now() - new Date(t.scored_at)) < 30000;
+    return `<div class="trow g-${t.grade} ${isNew ? 'fresh' : ''}" onclick="openMod('${t.address}')" style="animation-delay:${Math.min(i*0.015,0.4)}s">
+      <div class="tcell c"><div class="gbadge ${t.grade}">${t.grade}</div></div>
+      <div class="tcell">
+        <div class="tname">
+          <div class="tsym">${esc(t.symbol||'???')}</div>
+          <div class="tflags">${(t.flags||[]).slice(0,2).map(f=>`<span class="tf">${f.replace(/_/g,' ')}</span>`).join('')}</div>
         </div>
       </div>
-      <div class="td right"><span class="price">${fmtPrice(t.price_usd)}</span></div>
-      <div class="td right"><span class="change ${chgClass(t.price_change_5m)}">${fmtChg(t.price_change_5m)}</span></div>
-      <div class="td right"><span class="val">${fmtLarge(t.fdv)}</span></div>
-      <div class="td right">
-        <div class="buys-sells">
-          <span class="buys-num">${t.buys_5m || 0}</span>
-          <span style="color:rgba(200,232,248,0.2);font-size:10px">/</span>
-          <span class="sells-num">${t.sells_5m || 0}</span>
+      <div class="tcell r">
+        <div class="score-col">
+          <div class="sc-num" style="color:${gc}">${t.score}</div>
+          <div class="sc-bar"><div class="sc-fill" style="width:${t.score}%;background:${gc}"></div></div>
         </div>
       </div>
-      <div class="td right"><span class="age ${isUltraFresh(t.pair_created_at) ? 'fresh' : ''}">${fmtAge(t.pair_created_at)}</span></div>
-    </div>
-  `).join('');
-
-  document.getElementById('footer-count').textContent = `${filtered.length} tokens tracked`;
+      <div class="tcell r" style="font-family:var(--f2);font-size:10px;">${fmtP(t.price_usd)}</div>
+      <div class="tcell r"><span class="chg ${chgCls(t.price_change_5m)}">${fmtC(t.price_change_5m)}</span></div>
+      <div class="tcell r" style="font-size:10px;color:var(--txt2)">${fmtL(t.fdv)}</div>
+      <div class="tcell r"><div class="bs"><span style="color:var(--gn)">${t.buys_5m||0}</span><span style="color:var(--txt3);font-size:9px">/</span><span style="color:var(--rd)">${t.sells_5m||0}</span></div></div>
+      <div class="tcell r"><span class="age-col ${fresh?'age-hot':''}">${ageStr}</span></div>
+    </div>`;
+  }).join('');
 }
 
-// ══════════════════════════════════════════════════════════
-// RENDER ALERTS
-// ══════════════════════════════════════════════════════════
+// ══ RENDER ALERTS ════════════════════════════════════════════
 function renderAlerts() {
   const list = document.getElementById('alert-list');
-  const gradeFiltered = allAlerts.filter(a => a.grade === 'S' || a.grade === 'A');
+  const f = alerts.filter(a => a.grade === 'S' || a.grade === 'A');
+  document.getElementById('s-alerts').textContent = f.length;
 
-  if (!gradeFiltered.length) {
-    list.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">📡</div>
-      <div class="empty-text">SCANNING...</div>
-      <div class="empty-sub">grade S and A alerts appear here</div>
-    </div>`;
+  if (!f.length) {
+    list.innerHTML = `<div class="alert-empty"><div class="ae-icon">📡</div><div class="ae-txt">NO ALERTS YET</div></div>`;
     return;
   }
 
-  list.innerHTML = gradeFiltered.map((a, i) => `
-    <div class="alert-card grade-${a.grade}" style="animation-delay:${Math.min(i*0.03,0.5)}s">
-      <div class="alert-top">
-        <span class="alert-symbol">${esc(a.token_symbol || '???')}</span>
-        <span class="alert-grade ${a.grade}">${a.grade}</span>
+  list.innerHTML = f.map((a, i) => {
+    const gc = gcolor(a.grade);
+    return `<div class="acard a${a.grade.toLowerCase()}" style="animation-delay:${Math.min(i*0.03,0.5)}s">
+      <div class="atop">
+        <span class="asym">${esc(a.token_symbol||'???')}</span>
+        <span class="abadge ${a.grade}">${a.grade} — ${a.score}</span>
       </div>
-      <div class="alert-meta">
-        <span>${fmtTimeAgo(a.alerted_at)}</span>
-        <span style="color:${gradeColor(a.grade)}">${a.score}/100</span>
+      <div class="ameta"><span>${timeAgo(a.alerted_at)}</span><span style="color:${gc}">${a.score}/100</span></div>
+      <div class="abar"><div class="abar-fill" style="width:${a.score}%;background:${gc}"></div></div>
+      <div style="margin-bottom:6px;display:flex;flex-wrap:wrap;gap:3px;">${(a.flags||[]).slice(0,3).map(f=>`<span style="font-size:7px;padding:1px 4px;border:1px solid var(--line2);color:var(--txt2);font-family:var(--f1)">${f.replace(/_/g,' ')}</span>`).join('')}</div>
+      <div class="alinks">
+        <a class="alink" href="https://pump.fun/${a.token_address}" target="_blank">PUMP</a>
+        <a class="alink" href="https://dexscreener.com/solana/${a.token_address}" target="_blank">CHART</a>
+        <a class="alink" href="https://solscan.io/token/${a.token_address}" target="_blank">SCAN</a>
       </div>
-      <div class="alert-flags">${renderFlags(a.flags, true)}</div>
-      <div class="alert-score-row">
-        <div class="alert-score-track">
-          <div class="alert-score-fill" style="width:${a.score}%;background:${gradeColor(a.grade)}"></div>
-        </div>
-      </div>
-      <div class="alert-links">
-        <a class="alert-link" href="https://pump.fun/${a.token_address}" target="_blank">PUMP</a>
-        <a class="alert-link" href="https://dexscreener.com/solana/${a.token_address}" target="_blank">CHART</a>
-        <a class="alert-link" href="https://solscan.io/token/${a.token_address}" target="_blank">SCAN</a>
-      </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
-// ══════════════════════════════════════════════════════════
-// STATS
-// ══════════════════════════════════════════════════════════
+// ══ STATS ════════════════════════════════════════════════════
 function updateStats() {
-  const t = allTokens;
-  const avg = t.length ? Math.round(t.reduce((s,x) => s+(x.score||0),0)/t.length) : 0;
-  animateNum('stat-total', t.length);
-  animateNum('stat-s', t.filter(x=>x.grade==='S').length);
-  animateNum('stat-a', t.filter(x=>x.grade==='A').length);
-  animateNum('stat-b', t.filter(x=>x.grade==='B').length);
-  animateNum('stat-avg', avg);
-  animateNum('stat-alerts', allAlerts.length);
+  const avg = tokens.length ? Math.round(tokens.reduce((s,t)=>s+(t.score||0),0)/tokens.length) : 0;
+  anim('s-total', tokens.length);
+  anim('s-s', tokens.filter(t=>t.grade==='S').length);
+  anim('s-a', tokens.filter(t=>t.grade==='A').length);
+  anim('s-b', tokens.filter(t=>t.grade==='B').length);
+  anim('s-avg', avg);
 }
 
-function animateNum(id, target) {
+function anim(id, target) {
   const el = document.getElementById(id);
   if (!el) return;
-  const current = parseInt(el.textContent) || 0;
-  if (current === target) return;
-  const step = (target - current) / 15;
-  let val = current;
+  const cur = parseInt(el.textContent) || 0;
+  if (cur === target) return;
+  const step = (target - cur) / 12;
+  let v = cur;
   const tick = () => {
-    val += step;
-    el.textContent = Math.round(val);
-    if (Math.abs(val - target) > 0.5) requestAnimationFrame(tick);
+    v += step;
+    el.textContent = Math.round(v);
+    if (Math.abs(v - target) > 0.5) requestAnimationFrame(tick);
     else el.textContent = target;
   };
   requestAnimationFrame(tick);
 }
 
-// ══════════════════════════════════════════════════════════
-// MODAL
-// ══════════════════════════════════════════════════════════
-function openModal(address) {
-  const t = allTokens.find(x => x.address === address);
+// ══ MODAL ════════════════════════════════════════════════════
+function openMod(addr) {
+  const t = tokens.find(x => x.address === addr);
   if (!t) return;
-  const gc = gradeColor(t.grade);
-  document.getElementById('modal-content').innerHTML = `
-    <div class="modal-header">
-      <div class="modal-token-row">
-        ${t.image_url ? `<img src="${t.image_url}" style="width:48px;height:48px;border-radius:50%;border:1px solid ${gc}20" onerror="this.style.display='none'">` : ''}
-        <div class="modal-grade ${t.grade}">${t.grade}</div>
-        <div>
-          <div class="modal-symbol">${esc(t.symbol||'???')}</div>
-          <div class="modal-name">${esc(t.name||'Unknown')}</div>
-          <div class="modal-address">${t.address?.slice(0,24)}...${t.address?.slice(-8)}</div>
-        </div>
+  const gc = gcolor(t.grade);
+  document.getElementById('modal-inner').innerHTML = `
+    <div class="m-hdr">
+      ${t.image_url ? `<img src="${t.image_url}" style="width:44px;height:44px;border-radius:50%;border:1px solid ${gc}30" onerror="this.style.display='none'">` : ''}
+      <div class="m-grade ${t.grade}" style="background:${gc}15;color:${gc};">${t.grade}</div>
+      <div>
+        <div class="m-sym">${esc(t.symbol||'???')}</div>
+        <div class="m-name">${esc(t.name||'Unknown')}</div>
+        <div class="m-addr">${t.address}</div>
       </div>
     </div>
-    <div class="modal-score-section">
-      <div class="modal-score-header">
-        <span class="modal-score-label">SIGNAL SCORE</span>
-        <span class="modal-score-value" style="color:${gc}">${t.score}/100</span>
-      </div>
-      <div class="modal-score-track">
-        <div class="modal-score-fill" style="width:0%;background:${gc}" id="msf"></div>
-      </div>
+    <div class="m-score-section">
+      <div class="m-score-row"><span>SIGNAL SCORE</span><span class="m-score-val" style="color:${gc}">${t.score}/100</span></div>
+      <div class="m-bar"><div class="m-bar-fill" id="mbar" style="width:0%;background:${gc}"></div></div>
     </div>
-    <div class="modal-flags">${renderFlags(t.flags, false, true)}</div>
-    <div class="modal-stats">
-      ${[
-        ['PRICE', fmtPrice(t.price_usd)],
-        ['5M CHANGE', fmtChg(t.price_change_5m), chgColor(t.price_change_5m)],
-        ['1H CHANGE', fmtChg(t.price_change_1h), chgColor(t.price_change_1h)],
-        ['FDV', fmtLarge(t.fdv)],
-        ['LIQUIDITY', fmtLarge(t.liquidity_usd)],
-        ['VOL 1H', fmtLarge(t.volume_1h)],
-        ['BUYS 5M', t.buys_5m||0, 'var(--green)'],
-        ['SELLS 5M', t.sells_5m||0, 'var(--red)'],
-        ['BUY RATIO', `${((t.buy_ratio_5m||0.5)*100).toFixed(0)}%`],
-        ['HOLDERS', t.holder_count||'?'],
-        ['TOP 10%', `${(t.top10_pct||0).toFixed(1)}%`],
-        ['SMART $', t.smart_money_count||0, t.smart_money_count > 0 ? '#a78bfa' : null],
-      ].map(([label, val, color]) => `
-        <div class="modal-stat">
-          <div class="modal-stat-label">${label}</div>
-          <div class="modal-stat-value" style="color:${color||'#c8e8f8'}">${val}</div>
-        </div>
-      `).join('')}
+    <div class="m-flags">${(t.flags||[]).map(f=>`<span class="flag ${getFlagCls(f)}">${f.replace(/_/g,' ')}</span>`).join('')}</div>
+    <div class="m-stats">
+      ${[['PRICE',fmtP(t.price_usd),null],['5M CHG',fmtC(t.price_change_5m),chgColor(t.price_change_5m)],['1H CHG',fmtC(t.price_change_1h),chgColor(t.price_change_1h)],['FDV',fmtL(t.fdv),null],['LIQUIDITY',fmtL(t.liquidity_usd),t.liquidity_usd>50000?'var(--gn)':t.liquidity_usd<5000?'var(--rd)':null],['VOL 1H',fmtL(t.volume_1h),null],['BUYS 5M',t.buys_5m||0,'var(--gn)'],['SELLS 5M',t.sells_5m||0,'var(--rd)'],['BUY %',((t.buy_ratio_5m||0.5)*100).toFixed(0)+'%',t.buy_ratio_5m>0.65?'var(--gn)':t.buy_ratio_5m<0.35?'var(--rd)':null],['HOLDERS',t.holder_count||'?',null],['TOP 10%',(t.top10_pct||0).toFixed(1)+'%',null],['SMART $',t.smart_money_count||0,t.smart_money_count>0?'var(--pu)':null]].map(([l,v,c])=>`<div class="m-stat"><div class="m-stat-lbl">${l}</div><div class="m-stat-val" style="color:${c||'var(--txt)'}">${v}</div></div>`).join('')}
     </div>
-    <div class="modal-links">
-      <a class="modal-link" href="https://pump.fun/${t.address}" target="_blank">🔗 PUMP.FUN</a>
-      <a class="modal-link" href="${t.dex_url||`https://dexscreener.com/solana/${t.address}`}" target="_blank">📊 DEXSCREENER</a>
-      <a class="modal-link" href="https://solscan.io/token/${t.address}" target="_blank">🔎 SOLSCAN</a>
-      <a class="modal-link" href="https://birdeye.so/token/${t.address}?chain=solana" target="_blank">👁 BIRDEYE</a>
+    <div class="m-links">
+      <a class="m-link" href="https://pump.fun/${t.address}" target="_blank">🔗 PUMP.FUN</a>
+      <a class="m-link" href="${t.dex_url||'https://dexscreener.com/solana/'+t.address}" target="_blank">📊 DEXSCREENER</a>
+      <a class="m-link" href="https://solscan.io/token/${t.address}" target="_blank">🔎 SOLSCAN</a>
+      <a class="m-link" href="https://birdeye.so/token/${t.address}?chain=solana" target="_blank">👁 BIRDEYE</a>
+      <a class="m-link" href="https://rugcheck.xyz/tokens/${t.address}" target="_blank">🛡 RUGCHECK</a>
     </div>
   `;
-  document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => {
-    const fill = document.getElementById('msf');
-    if (fill) fill.style.width = t.score + '%';
-  }, 100);
+  document.getElementById('modal-bg').classList.add('open');
+  setTimeout(() => { const b = document.getElementById('mbar'); if(b) b.style.width = t.score + '%'; }, 100);
 }
 
-function closeModal(e) {
-  if (!e || e.target === document.getElementById('modal-overlay') || e.currentTarget.tagName === 'BUTTON') {
-    document.getElementById('modal-overlay').classList.remove('open');
+function closeMod(e) {
+  if (!e || e.target === document.getElementById('modal-bg') || e.currentTarget.tagName==='BUTTON') {
+    document.getElementById('modal-bg').classList.remove('open');
   }
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeMod(); });
 
-// ══════════════════════════════════════════════════════════
-// TOAST NOTIFICATIONS
-// ══════════════════════════════════════════════════════════
-function showToast(token) {
+// ══ TOAST ════════════════════════════════════════════════════
+function toast(token) {
   if (token.grade !== 'S' && token.grade !== 'A') return;
-  const container = document.getElementById('toast-container');
-  const toast = document.createElement('div');
-  toast.className = `toast grade-${token.grade}`;
-  toast.innerHTML = `${token.grade === 'S' ? '🚨' : '⚡'} [${token.grade}] ${esc(token.symbol||'???')} — ${token.score}/100`;
-  container.appendChild(toast);
-  setTimeout(() => toast.remove(), 4000);
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = `toast ${token.grade}`;
+  t.textContent = `${token.grade==='S'?'🔴':'⚡'} [${token.grade}] ${token.symbol||'???'} — ${token.score}/100`;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
 }
 
-// ══════════════════════════════════════════════════════════
-// HELPERS
-// ══════════════════════════════════════════════════════════
-function gradeColor(g) {
-  return { S: 'var(--orange)', A: 'var(--yellow)', B: 'var(--cyan)', C: '#334455' }[g] || '#888';
-}
-function chgClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu'; }
-function chgColor(v) { return v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'rgba(200,232,248,0.4)'; }
-function fmtChg(v) { if (!v) return '0.0%'; return `${v>0?'+':''}${Number(v).toFixed(1)}%`; }
+// ══ CA ANALYZER ══════════════════════════════════════════════
+async function analyzeCA() {
+  const input = document.getElementById('ca-input');
+  const result = document.getElementById('ca-result');
+  const btn = document.getElementById('ca-btn');
+  const ca = input.value.trim().replace(/\s+/g, '');
 
-function fmtPrice(p) {
-  if (!p) return '$0';
-  if (p < 0.000001) return '$' + Number(p).toExponential(2);
-  if (p < 0.001)    return '$' + Number(p).toFixed(8);
-  if (p < 1)        return '$' + Number(p).toFixed(6);
-  return '$' + Number(p).toFixed(4);
-}
-function fmtLarge(n) {
-  if (!n) return '$0';
-  if (n >= 1e9) return '$' + (n/1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return '$' + (n/1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return '$' + (n/1e3).toFixed(1) + 'K';
-  return '$' + Math.round(n);
-}
-function fmtAge(ts) {
-  if (!ts) return '?';
-  const m = Math.floor((Date.now() - new Date(ts)) / 60000);
-  if (m < 60) return m + 'm';
-  if (m < 1440) return Math.floor(m/60) + 'h';
-  return Math.floor(m/1440) + 'd';
-}
-function isUltraFresh(ts) {
-  if (!ts) return false;
-  return (Date.now() - new Date(ts)) < 10 * 60000;
-}
-function fmtTimeAgo(ts) {
-  if (!ts) return '?';
-  const m = Math.floor((Date.now() - new Date(ts)) / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return m + 'm ago';
-  return Math.floor(m/60) + 'h ago';
-}
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
-const FLAG_CLASSES = {
-  SMART_MONEY: 'flag-smart',
-  STRONG_BUY: 'flag-buy', MODERATE_BUY: 'flag-buy', ORGANIC_BUYS: 'flag-buy', HIGH_ORGANIC: 'flag-buy',
-  EXPLOSION: 'flag-surge', SURGE: 'flag-surge', PUMP: 'flag-surge', ULTRA_EARLY: 'flag-surge',
-  STRONG_LIQUIDITY: 'flag-safe', DECENT_LIQUIDITY: 'flag-safe', HAS_TWITTER: 'flag-safe',
-};
-function getFlagClass(flag) {
-  for (const [key, cls] of Object.entries(FLAG_CLASSES)) {
-    if (flag.includes(key)) return cls;
+  if (!ca || ca.length < 32) {
+    result.innerHTML = `<div class="ca-warn">⚠ Invalid — Solana CAs are 32-44 chars</div>`;
+    return;
   }
-  return 'flag-default';
+
+  result.innerHTML = `<div style="text-align:center;padding:30px 10px;">
+    <div style="width:36px;height:36px;border:1px solid var(--c);border-top-color:transparent;border-radius:50%;margin:0 auto 12px;animation:spin 0.8s linear infinite;"></div>
+    <div style="font-family:var(--f1);font-size:9px;letter-spacing:2px;color:var(--c)">SCANNING</div>
+    <div style="font-size:8px;color:var(--txt3);margin-top:4px">${ca.slice(0,8)}...${ca.slice(-6)}</div>
+  </div>`;
+  btn.disabled = true; btn.textContent = 'SCANNING...';
+
+  try {
+    const res = await fetch(`https://api.dexscreener.com/latest/dex/tokens/${ca}`);
+    const data = await res.json();
+    const pairs = data.pairs || [];
+
+    if (!pairs.length) {
+      result.innerHTML = `<div class="ca-warn">⚠ No pairs found<br><span style="font-size:8px;opacity:0.6">Not listed yet or wrong address</span></div>
+      <div style="margin-top:8px;display:flex;gap:4px;flex-wrap:wrap">
+        <a class="ca-link" href="https://solscan.io/token/${ca}" target="_blank">SOLSCAN</a>
+        <a class="ca-link" href="https://pump.fun/${ca}" target="_blank">PUMP.FUN</a>
+      </div>`;
+      return;
+    }
+
+    const pair = pairs.find(p => p.dexId === 'pumpfun') ||
+                 pairs.sort((a,b) => (b.liquidity?.usd||0)-(a.liquidity?.usd||0))[0];
+
+    const t = {
+      address: ca,
+      symbol: pair.baseToken?.symbol || '???',
+      name: pair.baseToken?.name || 'Unknown',
+      priceUsd: parseFloat(pair.priceUsd||0),
+      priceChange5m: pair.priceChange?.m5||0,
+      priceChange1h: pair.priceChange?.h1||0,
+      priceChange6h: pair.priceChange?.h6||0,
+      volume5m: pair.volume?.m5||0,
+      volume1h: pair.volume?.h1||0,
+      volume24h: pair.volume?.h24||0,
+      liquidityUsd: pair.liquidity?.usd||0,
+      fdv: pair.fdv||0,
+      marketCap: pair.marketCap||0,
+      buys5m: pair.txns?.m5?.buys||0,
+      sells5m: pair.txns?.m5?.sells||0,
+      buys1h: pair.txns?.h1?.buys||0,
+      sells1h: pair.txns?.h1?.sells||0,
+      buyRatio5m: (() => { const tx=pair.txns?.m5; if(!tx) return 0.5; const tot=(tx.buys||0)+(tx.sells||0); return tot?tx.buys/tot:0.5; })(),
+      pairCreatedAt: pair.pairCreatedAt,
+      imageUrl: pair.info?.imageUrl,
+      socials: pair.info?.socials||[],
+      websites: pair.info?.websites||[],
+      dexUrl: pair.url, dexId: pair.dexId,
+      pairCount: pairs.length,
+    };
+
+    const sr = caScore(t);
+    const gc = gcolor(sr.grade);
+    const ageMin = t.pairCreatedAt ? Math.round((Date.now()-t.pairCreatedAt)/60000) : null;
+    const ageStr = ageMin===null ? '?' : ageMin<60 ? ageMin+'m' : Math.floor(ageMin/60)+'h '+(ageMin%60)+'m';
+
+    result.innerHTML = `
+      ${t.imageUrl?`<img src="${t.imageUrl}" style="width:40px;height:40px;border-radius:50%;border:1px solid ${gc}30;margin-bottom:8px" onerror="this.style.display='none'">`:''}
+      <div class="ca-result-hdr">
+        <div class="ca-grade" style="background:${gc}15;color:${gc}">${sr.grade}</div>
+        <div>
+          <div class="ca-sym">${esc(t.symbol)}</div>
+          <div class="ca-nm">${esc(t.name)}</div>
+        </div>
+        <div class="ca-score-big" style="color:${gc}">${sr.score}</div>
+      </div>
+      <div class="ca-bar-wrap">
+        <div class="ca-bar-track"><div class="ca-bar-fill" style="width:${sr.score}%;background:${gc}"></div></div>
+      </div>
+
+      ${sr.warnings.length?`<div class="ca-warn" style="margin-top:6px">${sr.warnings.map(w=>`${w}`).join('<br>')}</div>`:''}
+
+      <div style="margin-top:6px">
+        <div class="ca-label">SIGNALS</div>
+        <div class="ca-flags">${sr.flags.map(f=>`<span class="flag ${getFlagCls(f)}">${f.replace(/_/g,' ')}</span>`).join('') || '<span style="font-size:8px;color:var(--txt3)">none detected</span>'}</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ca-stat-grid">
+        ${[['PRICE',fmtP(t.priceUsd)],['5M %',fmtC(t.priceChange5m)],['1H %',fmtC(t.priceChange1h)],['FDV',fmtL(t.fdv)],['LIQ',fmtL(t.liquidityUsd)],['VOL 5M',fmtL(t.volume5m)],['BUYS',t.buys5m],['SELLS',t.sells5m],['B%',((t.buyRatio5m)*100).toFixed(0)+'%'],['VOL 24H',fmtL(t.volume24h)],['AGE',ageStr],['PAIRS',t.pairCount]].map(([l,v])=>`<div class="ca-stat-cell"><div class="ca-stat-lbl">${l}</div><div class="ca-stat-val">${v}</div></div>`).join('')}
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="ca-label">OPEN IN</div>
+      <div class="ca-links">
+        <a class="ca-link" href="https://pump.fun/${ca}" target="_blank">PUMP</a>
+        <a class="ca-link" href="${t.dexUrl||'https://dexscreener.com/solana/'+ca}" target="_blank">DEX</a>
+        <a class="ca-link" href="https://solscan.io/token/${ca}" target="_blank">SCAN</a>
+        <a class="ca-link" href="https://birdeye.so/token/${ca}?chain=solana" target="_blank">BIRD</a>
+        <a class="ca-link" href="https://rugcheck.xyz/tokens/${ca}" target="_blank">RUG✓</a>
+      </div>
+    `;
+  } catch(err) {
+    result.innerHTML = `<div class="ca-warn">⚠ Error: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = '⬡ ANALYZE TOKEN';
+  }
 }
-function renderFlags(flags, small = false, large = false) {
-  if (!flags?.length) return '';
-  const limit = large ? 8 : small ? 3 : 4;
-  return (flags || []).slice(0, limit).map(f =>
-    `<span class="flag ${getFlagClass(f)}" style="${large ? 'font-size:10px;padding:3px 8px' : ''}">${f.replace(/_/g,' ')}</span>`
-  ).join('');
+
+function caScore(t) {
+  let score = 0; const flags = []; const warnings = [];
+  if (t.liquidityUsd < 3000) warnings.push('⚠ LOW LIQUIDITY');
+  if (t.buyRatio5m < 0.3) warnings.push('⚠ HEAVY SELLING PRESSURE');
+  if (t.buyRatio5m >= 0.75)        { score+=18; flags.push('STRONG_BUY_PRESSURE'); }
+  else if (t.buyRatio5m >= 0.6)    { score+=10; flags.push('MODERATE_BUY_PRESSURE'); }
+  if (t.priceChange5m >= 50)       { score+=12; flags.push('5M_EXPLOSION'); }
+  else if (t.priceChange5m >= 20)  { score+=8;  flags.push('5M_SURGE'); }
+  else if (t.priceChange5m >= 5)   { score+=4;  flags.push('5M_PUMP'); }
+  if (t.buys5m >= 50)              { score+=10; flags.push('HIGH_ORGANIC_BUYS'); }
+  else if (t.buys5m >= 20)         { score+=5;  flags.push('ORGANIC_BUYS'); }
+  if (t.liquidityUsd >= 50000)     { score+=12; flags.push('STRONG_LIQUIDITY'); }
+  else if (t.liquidityUsd >= 15000){ score+=6;  flags.push('DECENT_LIQUIDITY'); }
+  else if (t.liquidityUsd >= 5000) { score+=2;  flags.push('FAIR_LIQUIDITY'); }
+  const age = t.pairCreatedAt ? (Date.now()-t.pairCreatedAt)/60000 : 999;
+  if (age<=5)       { score+=10; flags.push('ULTRA_EARLY'); }
+  else if (age<=15) { score+=6;  flags.push('EARLY_ENTRY'); }
+  else if (age<=60) { score+=2;  flags.push('RECENT'); }
+  if (t.socials?.some(s=>s.type==='twitter'))  { score+=5; flags.push('HAS_TWITTER'); }
+  if (t.socials?.some(s=>s.type==='telegram')) { score+=5; flags.push('HAS_TELEGRAM'); }
+  if (t.websites?.length > 0)                  { score+=5; flags.push('HAS_WEBSITE'); }
+  if (t.pairCount > 3) { score+=5; flags.push('MULTI_DEX'); }
+  score = Math.min(score, 100);
+  const grade = score>=80?'S':score>=60?'A':score>=40?'B':'C';
+  return { score, grade, flags, warnings };
+}
+
+// ══ HELPERS ══════════════════════════════════════════════════
+function gcolor(g) { return {S:'var(--og)',A:'var(--ga)',B:'var(--gb)',C:'var(--txt3)'}[g]||'#888'; }
+function chgCls(v) { return v>0?'pos':v<0?'neg':'neu'; }
+function chgColor(v) { return v>0?'var(--gn)':v<0?'var(--rd)':'var(--txt3)'; }
+function fmtC(v) { if(!v) return '0.0%'; return (v>0?'+':'')+Number(v).toFixed(1)+'%'; }
+function fmtP(p) {
+  if (!p) return '$0';
+  if (p < 0.000001) return '$'+Number(p).toExponential(2);
+  if (p < 0.001) return '$'+Number(p).toFixed(8);
+  if (p < 1) return '$'+Number(p).toFixed(6);
+  return '$'+Number(p).toFixed(4);
+}
+function fmtL(n) {
+  if (!n) return '$0';
+  if (n>=1e9) return '$'+(n/1e9).toFixed(1)+'B';
+  if (n>=1e6) return '$'+(n/1e6).toFixed(1)+'M';
+  if (n>=1e3) return '$'+(n/1e3).toFixed(1)+'K';
+  return '$'+Math.round(n);
+}
+function timeAgo(ts) {
+  if (!ts) return '?';
+  const m = Math.floor((Date.now()-new Date(ts))/60000);
+  if (m<1) return 'just now';
+  if (m<60) return m+'m ago';
+  return Math.floor(m/60)+'h ago';
+}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function getFlagCls(f) {
+  if (f.includes('SMART')||f.includes('MULTI')) return 'flag-s';
+  if (f.includes('BUY')||f.includes('EARLY')||f.includes('EXPLOSION')||f.includes('SURGE')) return 'flag-b';
+  if (f.includes('LIQUID')||f.includes('TWITTER')||f.includes('TELEGRAM')||f.includes('WEBSITE')) return 'flag-c';
+  return 'flag-d';
 }
 </script>
 </body>
